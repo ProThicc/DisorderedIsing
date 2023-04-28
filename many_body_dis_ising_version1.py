@@ -8,7 +8,7 @@ from qiskit import Aer, transpile
 from qiskit.circuit import Parameter
 from qiskit.visualization import plot_histogram
 from scipy.linalg import expm
-from qiskit.quantum_info import Operator
+from qiskit.quantum_info import Operator, random_pauli
 
 
 N = 4 #Number of qubits
@@ -73,15 +73,23 @@ def b(t):
 def GSA_approx(T, L, J):
     dt = T/L                    # time step
     qc = QuantumCircuit(N)
-    for qubit in range(0, N):   # creating uniform superposition
+    for qubit in range(0, N):  # creating uniform superposition
         qc.h(qubit)
     for k in range(L):
-        for i in range(N-2, -1, -1):
+        for i in range(N-2, -1, -2): #even bonds
             j = i+1
-            qc.rzz(-1 * a(k*dt/T) * J[i, j] * dt, j, i)
-        for i in range(0, N):      # H_D = uniform X field as the Driver Hamiltonian
-            qc.rx(1 * b(k*dt/T) * dt, i)
+            qc.rzz(-0.1* a(k/L) * J[i, j] * dt, j, i)
+        for i in range(0, N, 2): #even bonds      # H_D = uniform X field as the Driver Hamiltonian
+            qc.rx(0.1 * b(k/L) * dt, i)
+        for i in range(N-3, -1, -2): #odd bonds
+            j = i+1
+            qc.rzz(-0.1 * a(k/L) * J[i, j] * dt, j, i)
+        for i in range(1, N-1, 2): #odd bonds      # H_D = uniform X field as the Driver Hamiltonian
+            qc.rx(0.1 * b(k/L) * dt, i)
     qc.measure_all()
+    return qc
+
+def measure_circuit(qc):
     num_shots_per_point = 1024
     sim = Aer.get_backend('aer_simulator')
     t_qc = transpile(qc, sim)
@@ -94,24 +102,36 @@ def GSA_approx(T, L, J):
     expectation_z = expectation_z / num_shots_per_point
     return expectation_z
 
-L = 15
-T = 4*np.pi
-# GSA_approx(T,L,J)
 
-print(GSA_approx(T, L, J))
+T = 20*np.pi       #final time
+L = 15 #layers
+#print(GSA_approx(T,L,J))
+print(measure_circuit(GSA_approx(T,L,J)))
 
-# Llist = np.linspace(10,200,15,dtype=int)
-# approx = np.zeros((15))
-# for i in range(15):
-#     print(i)
-#     approx[i]=np.abs(np.abs(analytical_groundstate_energy)-np.abs(GSA_approx(T,Llist[i],J)))
-#
-# plt.plot(Llist,approx)
-# plt.xlabel('L')
-# plt.ylabel('ΔE')
-# plt.title("Ground State approximation")
-# plt.savefig("Groundstateapprox_vs_L(fixed T).pdf")
-# plt.show()
+
+T = 100*np.pi
+#L= 15
+num_points = 200
+#Tlist =np.linspace(30*np.pi,150*np.pi,num_points) 
+Llist = np.linspace(10,200,num_points,dtype=int)
+approx = np.zeros((num_points ))
+for i in range(num_points ):
+    #print(i)
+    approx[i]=np.abs(np.abs(analytical_groundstate_energy)-np.abs(measure_circuit(GSA_approx(T,Llist[i],J))))
+    #print(measure_circuit(GSA_approx(Tlist[i],L,J)))
+    #approx[i]=np.abs(np.abs(analytical_groundstate_energy)-np.abs(measure_circuit(GSA_approx(Tlist[i],L,J))))
+print("completed")
+
+
+plt.plot(Llist[:15],approx[:15])
+plt.xlabel('L')
+#plt.xlabel('T')
+plt.ylabel('ΔE')
+plt.title("Ground State approximation")
+#plt.savefig("Groundstateapprox_vs_T(L=15).pdf")
+#plt.savefig("Groundstateapprox_vs_L(T = 100π)_zoom.pdf")
+plt.show()
+
 
     
 
